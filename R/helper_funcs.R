@@ -18,34 +18,12 @@ get_filterable_attributes <- function(list) {
   outlist <- list[which(keep==1)]
 
   outlist <- outlist[which(names(outlist) %in% c("TracerName",
-                        "ModeOfAdministration",
-                        "InstitutionName",
-                        "PharmaceuticalName"))]
+                        "seg",
+                        "pvc",
+                        "deriv"))]
 
   tibble::as_tibble(outlist)
 
-
-}
-
-#' @export
-extract_extra_attributes <- function(bidsdata) {
-
-  petinfoextract <- function(petinfo, detail) petinfo[[detail]]
-
-  safely_extract <- purrr::possibly(.f = petinfoextract, otherwise = "")
-
-  bidsdata$TracerName = purrr::map_chr(bidsdata$petinfo,
-                                       safely_extract,
-                                       detail="TracerName")
-  bidsdata$ModeOfAdministration = purrr::map_chr(bidsdata$petinfo,
-                                                 safely_extract,
-                                                 detail="ModeOfAdministration")
-  bidsdata$InstitutionName = purrr::map_chr(bidsdata$petinfo,
-                                            safely_extract,
-                                            detail="InstitutionName")
-  bidsdata$PharmaceuticalName = purrr::map_chr(bidsdata$petinfo,
-                                               safely_extract,
-                                               detail="PharmaceuticalName")
 
 }
 
@@ -58,7 +36,7 @@ get_petname <- function(filedata) {
 
   petname <- basename(petname$path)
   stringr::str_remove(petname,
-                                 "_recording.*")
+                                 "_tacs.*")
 
 }
 
