@@ -1,0 +1,18 @@
+{
+  "time": {
+    "Description": ["Interpolated time in relation to time zero defined in _pet.json"],
+    "Units": ["s"]
+  },
+  "whole_blood_radioactivity": {
+    "Description": ["Estimated interpolated radioactivity in whole blood samples"],
+    "Units": ["Bq"]
+  },
+  "plasma_radioactivity": {
+    "Description": ["Estimated interpolated radioactivity in whole plasma samples"],
+    "Units": ["Bq"]
+  },
+  "AIF": {
+    "Description": ["Estimated interpolated radioactivity in metabolite-corrected arterial plasma samples"],
+    "Units": ["Bq"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+    "Name": "petdeface - PET and Anatomical Defacing workflow: PET Defaced Version of BIDS Dataset `petdeface - PET and Anatomical Defacing workflow: PET Defaced Version of BIDS Dataset `COX-2 MC1 PET Scans``",
+    "BIDSVersion": "1.8.0",
+    "GeneratedBy": [
+        {
+            "Name": "PET Deface",
+            "Version": "0.0.0",
+            "CodeURL": "https://github.com/bendhouseart/petdeface"
+        }
+    ],
+    "HowToAcknowledge": "This workflow uses FreeSurfer: `Fischl, B., FreeSurfer. Neuroimage, 2012. 62(2): p. 774-8.`,and the MiDeFace package developed by Doug Greve: `https://surfer.nmr.mgh.harvard.edu/fswiki/MiDeFace`",
+    "License": "CCBY"
+}

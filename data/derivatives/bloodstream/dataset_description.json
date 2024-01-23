@@ -1,0 +1,10 @@
+{
+  "Name": ["bloodstream Outputs"],
+  "BIDSVersion": ["1.7.0"],
+  "DatasetType": ["derivative"],
+  "GeneratedBy": {
+    "Name": ["bloodstream"],
+    "Version": ["0.1.0"],
+    "Container": {}
+  }
+}

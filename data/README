@@ -1,0 +1,6 @@
+This is a dataset of conversion from MC1 Scans imaging COX-2 in human brains.
+
+Data was provided by Xuefeng Yan and converted from dicoms to BID-valid structures by Adrian Lee with mentorship by Anthony Galassi .
+
+The subject files within will be processed by Martin Norgard. Overseeing this project is Dr. Robert Innis and his lab, the Molecular Imaging Branch, 
+located in Clinical Center Building 10 of the NIH. 
