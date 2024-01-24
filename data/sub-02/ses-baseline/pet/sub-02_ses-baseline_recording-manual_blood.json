@@ -11,7 +11,7 @@
     },
     "plasma_radioactivity": {
         "Description": "Radioactivity in plasma samples.",
-        "Units": "Bq/mL"
+        "Units": "kBq/mL"
     },
     "metabolite_parent_fraction": {
         "Description": "Parent fraction of Radio tracer",
@@ -19,6 +19,6 @@
     },
     "whole_blood_radioactivity": {
         "Description": "Radioactivity in whole blood samples.",
-        "Units": "Bq/mL"
+        "Units": "kBq/mL"
     }
 }
