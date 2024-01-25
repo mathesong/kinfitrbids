@@ -1,0 +1,679 @@
+---
+title: "2TCM Analysis"
+params:
+  configpath: ""
+  studypath: ""
+output:
+  html_document:
+    toc: true
+    toc-depth: 2
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+```{r libraries}
+#| output: false
+
+library(tidyverse)
+library(jsonlite)
+library(cowplot)
+library(stringr)
+library(knitr)
+library(glue)
+library(ggbeeswarm)
+
+library(kinfitr)
+library(bloodstream)
+
+configpath <- params$configpath
+configname <- basename(configpath)
+
+theme_set(theme_light())
+```
+
+
+NOTE: "### Change when updated ###" for things that need to be updated when other steps are finished.
+
+```{r}
+# config <- jsonlite::fromJSON(configpath)
+# config_subset <- parse_config_subsets(config)
+# config_suffix <- str_match(configname, "^config_?-?(.*)\\.json")[,2]
+
+
+
+### Change when updated ###
+outputregion <- "Hippocampus"
+seg <- "brainstem"
+regionname<- "RegionX"
+segregions <- c("Midbrain", "Pons")
+config_subset <- tibble()
+
+paramsX <- list()
+
+paramsX$studypath <- "C:/Users/mathe/Repositories/kinfitrbids/data/derivatives/petprep_extract_tacs/"
+
+paramsX$bloodpath <- "C:/Users/mathe/Repositories/kinfitrbids/data/derivatives/bloodstream/"
+
+```
+
+
+
+## Modelling Configuration
+
+Here are the contents of the config file with regard to which models will be fit to the data and how.
+
+```{r}
+# str(config$Model)
+```
+
+
+## Load the data
+
+
+### TACs
+
+<!-- No subsetting -->
+
+```{r}
+#| echo: false
+
+subsetting <- (ncol(config_subset) > 0)
+no_subsetting <- !subsetting
+```
+
+```{r load-data, eval=no_subsetting,echo=no_subsetting}
+
+### Change when updated ###
+region1 <- "Midbrain"
+region2 <- "Pons"
+region3 <- "Medulla"
+region4 <- "SCP"
+region5 <- c("Midbrain", "Pons", "Medulla", "SCP")
+
+bids_files <- bids_parse_files(paramsX$studypath) 
+bids_files$pet <- attributes_to_title(bids_files)
+
+
+### Change when updated ###
+# This will change to _morph.tsv
+all_voldata <- bids_files %>% 
+  unnest(filedata) %>% 
+  filter(measurement=="stats") %>% 
+  filter(desc == seg) %>% 
+  mutate(vols = map(path_absolute, ~read.delim(.x, sep="\t"))) %>% 
+  select(ses:run, pet, vols) %>% 
+  mutate(vols = map(vols, ~.x %>% 
+                      gather(Region, Volume))) %>% 
+  unnest(vols)
+
+all_tacdata <- bids_files %>% 
+  unnest(filedata) %>% 
+  filter(measurement=="tacs") %>% 
+  filter(desc == seg) %>% 
+  mutate(tacs = map(path_absolute, ~read.delim(.x, sep="\t"))) %>% 
+  select(ses:run, desc, pet, tacs) %>% 
+  mutate(tacs = map(tacs, ~.x %>% 
+                      mutate(frame_start = frame_start / 60,
+                             frame_end = frame_end / 60,
+                             t_tac = frame_start + (frame_end - frame_start)/2,
+                             dur = frame_end-frame_start) %>% 
+                      gather(Region, tac, -frame_start, -frame_end, 
+                                                    -t_tac, -dur) %>% 
+                      mutate(tac = unit_convert(tac, 
+                                                          from_units="Bq",
+                                                          to_units = "kBq")))) %>% 
+  unnest(tacs)
+  
+
+tac_information <- all_tacdata %>% 
+  ungroup() %>% 
+  filter(Region == Region[1]) %>% 
+  select(-Region, -tac)
+
+
+tacs_region1 <- tac_combine_sample(roi_regions = region1,
+                  t_tac = all_tacdata$t_tac, 
+                  tac = all_tacdata$tac, 
+                  all_tacdata$Region, 
+                  all_tacdata$pet,
+                  all_voldata$Volume,
+                  all_voldata$Region,
+                  all_voldata$pet) %>% 
+  rename(Region1 = tac)
+
+tacs_region2 <- tac_combine_sample(roi_regions = region2,
+                  t_tac = all_tacdata$t_tac, 
+                  tac = all_tacdata$tac, 
+                  all_tacdata$Region, 
+                  all_tacdata$pet,
+                  all_voldata$Volume,
+                  all_voldata$Region,
+                  all_voldata$pet) %>% 
+  rename(Region2 = tac)
+
+tacs_region3 <- tac_combine_sample(roi_regions = region3,
+                  t_tac = all_tacdata$t_tac, 
+                  tac = all_tacdata$tac, 
+                  all_tacdata$Region, 
+                  all_tacdata$pet,
+                  all_voldata$Volume,
+                  all_voldata$Region,
+                  all_voldata$pet) %>% 
+  rename(Region3 = tac)
+
+tacs_region4 <- tac_combine_sample(roi_regions = region4,
+                  t_tac = all_tacdata$t_tac, 
+                  tac = all_tacdata$tac, 
+                  all_tacdata$Region, 
+                  all_tacdata$pet,
+                  all_voldata$Volume,
+                  all_voldata$Region,
+                  all_voldata$pet) %>% 
+  rename(Region4 = tac)
+
+tacs_region5 <- tac_combine_sample(roi_regions = region5,
+                  t_tac = all_tacdata$t_tac, 
+                  tac = all_tacdata$tac, 
+                  all_tacdata$Region, 
+                  all_tacdata$pet,
+                  all_voldata$Volume,
+                  all_voldata$Region,
+                  all_voldata$pet) %>% 
+  rename(Region5 = tac)
+
+tacs_regions <- inner_join(
+  tacs_region1, tacs_region2, by = c("pet", "t_tac")) %>%
+  inner_join(tacs_region3, by = c("pet", "t_tac")) %>% 
+  inner_join(tacs_region4, by = c("pet", "t_tac")) %>% 
+  inner_join(tacs_region5, by = c("pet", "t_tac"))
+
+
+tacdata <- inner_join(tac_information, tacs_regions) %>% 
+  pivot_longer(cols = Region1:Region5, values_to = "TAC", names_to = "Region") %>% 
+  group_by(pet) %>% 
+  nest(.key = "tacs")
+```
+
+### Blood
+
+```{r}
+inputdata <- bloodstream_import_inputfunctions(paramsX$bloodpath) %>% 
+  left_join(bids_files) %>% 
+  select(-filedata, -measurement) %>% 
+  mutate(input = map(input, ~.x %>% ### Change when updated ###
+                       mutate(
+                         Blood = Blood*1000,
+                         Plasma = Plasma*1000,
+                         AIF = AIF*1000)))
+```
+
+
+
+
+
+<!-- <!-- Subsetting --> -->
+
+<!-- ```{r subsetting, eval=subsetting,echo=subsetting} -->
+<!-- # Subsetting -->
+
+<!-- ### Extract measurement information -->
+<!-- measurements <- bids_parse_files(params$studypath) %>% -->
+<!--   mutate(petinfo = map(filedata, -->
+<!--                             kinfitr:::bids_parse_petinfo)) -->
+
+<!-- extra_pet_details <- map(measurements$petinfo, -->
+<!--                          get_filterable_attributes) %>% -->
+<!--   bind_rows() -->
+
+<!-- measurements <- bind_cols(extra_pet_details, measurements) %>% -->
+<!--   all_identifiers_to_character() -->
+
+
+<!-- ### Filter -->
+<!-- measurements <- measurements %>% -->
+<!--   inner_join(config_subset,  -->
+<!--              by = colnames(config_subset)) -->
+
+
+<!-- ### Continue to process -->
+<!-- bidsdata <- measurements -->
+<!-- bidsdata$blooddata <- purrr::map(bidsdata$filedata, -->
+<!--     bids_create_blooddata) -->
+<!-- bidsdata$tactimes <- purrr::map(bidsdata$filedata, -->
+<!--     kinfitr:::bids_parse_pettimes) -->
+<!-- bidsdata <- dplyr::filter(bidsdata, !is.na(tactimes)) -->
+
+<!-- bidsdata$pet <- attributes_to_title(bidsdata) -->
+<!-- bidsdata$fulltitle <- attributes_to_title(bidsdata, all_attributes = T) -->
+<!-- ``` -->
+
+
+
+
+
+
+<!-- <!-- Data Subsetting --> -->
+
+<!-- ```{r, eval=subsetting,echo=subsetting  } -->
+<!-- #| results: asis -->
+<!-- #| echo: false -->
+
+<!-- str_glue("## Data Subset -->
+
+<!--            Based on the config file, only a subset of the data will be processed in this analysis. The subsets defined are as follows:") -->
+<!-- ``` -->
+
+<!-- ```{r, eval=subsetting,echo=subsetting } -->
+<!-- kable(config_subset) -->
+<!-- ``` -->
+
+<!-- ```{r, eval=subsetting,echo=subsetting } -->
+<!-- #| results: asis -->
+<!-- #| echo: false -->
+
+<!-- str_glue("The resulting list of blood measurements in the following analysis are as follows:") -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- #| echo: false -->
+<!-- bidsdata_attributes <- bidsdata %>%  -->
+<!--   select(1:(which(colnames(bidsdata)=="filedata")-1), pet) -->
+<!-- ``` -->
+
+<!-- ```{r subsetted-data,echo=FALSE, eval=subsetting} -->
+<!-- kable(bidsdata_attributes) -->
+<!-- ``` -->
+
+
+
+## Quality Control
+
+
+
+
+### Plotting
+
+#### TACs
+
+Below is the TAC data prior to any modelling. Inspect these plots to to check for strange values. The left plot is with the original times, while the right plot presents a log-scaled x axis, allowing closer inspection of the early parts of the curve.
+
+```{r initial-plotting, fig.height=5, fig.width=11}
+#| warning: false
+#| message: false
+#| fig-height: 5
+#| fig-width: 11
+
+map2(tacdata$tacs, tacdata$pet,
+     ~plot_tacdata_extra(.x, .y)) 
+```
+
+
+#### TACs and Input
+
+```{r tac-and-blood-plotting, fig.height=5, fig.width=11}
+#| warning: false
+#| message: false
+#| fig-height: 5
+#| fig-width: 11
+
+
+dat <- tacdata %>% 
+  inner_join(inputdata)
+
+pmap(list(dat$tacs, dat$input, dat$pet),
+     plot_tacblooddata_extra)
+```
+
+And focusing on the first 5 minutes
+
+```{r tac-and-blood-plotting_5, fig.height=4, fig.width=5}
+#| warning: false
+#| message: false
+
+
+dat <- tacdata %>% 
+  inner_join(inputdata)
+
+pmap(list(dat$tacs, dat$input, dat$pet),
+     plot_tacblooddata, tmax=5)
+```
+
+
+
+## Modelling
+
+### Delay Fitting
+
+First, we prepare the data for the delay fitting
+
+```{r}
+longdat <- tacdata %>% 
+  unnest(tacs) %>% 
+  group_by(pet, Region) %>% 
+  nest(.key="tacs") %>% 
+  inner_join(inputdata)
+```
+
+Now we fit the delay based on the first minutes for each of the measurements and regions.
+
+```{r}
+maxminutes <- 5 ### Change when updated ###  # This should come from the user input
+
+fit_delay <- function(tacs, input, frames) {
+  onetcm(t_tac = tacs$t_tac, 
+         tac = tacs$TAC,
+         input = input, 
+         frameStartEnd = c(1, frames),
+         vB = 0.05)
+}
+
+longdat <- longdat %>% 
+  group_by(pet, Region) %>% 
+  mutate(endFrame = map_dbl(tacs, ~sum(.x$frame_end < maxminutes))) %>% 
+  mutate(delayFit = pmap(list(tacs, input, endFrame),
+                         fit_delay))
+```
+Now we can look at the estimates of the delay
+
+```{r}
+delay_output <- longdat %>% 
+  select(pet, Region, delayFit) %>% 
+  mutate(inpshift_reg = map_dbl(delayFit, c("par", "inpshift"))) %>% 
+  group_by(pet) %>% 
+  mutate(inpshift_pet = median(inpshift_reg))
+
+ggplot(delay_output, aes(x=pet, y=inpshift_reg, colour=Region)) +
+  geom_beeswarm() +
+  geom_point(aes(y=inpshift_pet), size=5, colour="black", alpha=0.05) +
+  labs(y = "Estimated Input Shift (min)") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+And let's re-fit with the PET-wise, rather than the region-wise delay estimates
+
+```{r}
+fit_delay2 <- function(tacs, input, frames, inpshift) {
+  onetcm(t_tac = tacs$t_tac, 
+         tac = tacs$TAC,
+         input = input, 
+         inpshift = inpshift,
+         frameStartEnd = c(1, frames),
+         vB = 0.05)
+}
+
+longdat <- longdat %>% 
+  mutate(inpshift_reg = map_dbl(delayFit, c("par", "inpshift"))) %>% 
+  group_by(pet) %>% 
+  mutate(inpshift_pet = median(inpshift_reg)) %>% 
+  group_by(pet, Region) %>% 
+  mutate(delayFit2 = pmap(list(tacs, input, endFrame, inpshift_pet),
+                         fit_delay2))
+
+plotdat <- longdat %>% 
+  group_by(pet, Region) %>% 
+  mutate(plotId = paste(pet, Region)) %>% 
+  mutate(delayFitPlot = map2(delayFit2, Region, 
+                             ~plot(.x) + ggtitle(plotId)))
+
+plotdat$delayFitPlot
+
+
+
+plotdat2 <- longdat %>% 
+  
+
+# fitplotdat <- longdat %>%
+#   mutate(plotdata2 = map(delayFit2, ~plot(.x)$data)) %>%
+#   mutate(plotdata2 = map2(plotdata2, Region, ~.x %>%
+#                             mutate(Region = str_replace(Region, "ROI", .y)))) %>%
+#   ungroup() %>%
+#   select(pet, plotdata) %>%
+#   unnest(plotdata) %>%
+#   group_by(pet) %>%
+#   nest()
+
+# ggplot(plotdf, aes(x = Time, y = Radioactivity, 
+#         colour = Region)) + colScale + geom_point(data = subset(plotdf, 
+#         plotdf$Region == paste0(roiname, ".Measured")), 
+#         aes(shape = "a", size = Weights)) + geom_line(data = subset(plotdf, 
+#         plotdf$Region != paste0(roiname, ".Measured"))) + 
+#         guides(shape = "none", color = guide_legend(order = 1)) + 
+#         scale_size(range = c(1, 3)) + coord_cartesian(ylim = c(0, 
+#         max(measureddf$Radioactivity) * 1.5))
+```
+Note to self: there's definitely a better way to do this putting all the regions together, but it's hard. To fix another time.
+
+
+
+
+```{r}
+interptime <- seq(0, 5, length.out=1000)
+
+delay_preds <- longdat %>% 
+  mutate(preds = map(delayFit, ~tibble(
+    Time = interptime,
+    TACpred = predict(.x$fit, newdata=list(t_tac = interptime))))) %>%
+  mutate(inpshift_reg = map_dbl(delayFit, c("par", "inpshift"))) %>% 
+  group_by(pet) %>% 
+  mutate(inpshift_pet = median(inpshift_reg)) %>% 
+  mutate(input = map(input, ~.x %>% 
+                       mutate(Time = Time + inpshift_pet)))
+
+
+```
+
+
+
+
+## Final Plotting
+
+```{r}
+#| echo: false
+
+final_plotting <- any(
+  fit_pf,
+  fit_bpr,
+  fit_aif,
+  fit_wb
+)
+
+all_interp <- !final_plotting
+```
+
+```{r, eval=fit_wb}
+#| results: asis
+#| echo: false
+
+str_glue("Below are shown the fits to all the blood data after modelling. Inspect these plots to make sure that everything seems fine.")
+```
+
+```{r final-plotting, fig.height=5, fig.width=11}
+#| warning: false
+#| message: false
+#| fig-height: 5
+#| fig-width: 11
+
+map2(bidsdata$blooddata, bidsdata$pet,
+     plot_blooddata_extra)
+```
+
+```{r, eval=all_interp}
+#| results: asis
+#| echo: false
+
+str_glue("Because no modelling was performed, the final plots are the same as the initial plots.")
+```
+
+## Output
+
+First, we create the relevant filenames, and delete any files in the relevant folders.
+
+```{r prep-output-filenames, results='hide'}
+bidsdata <- bidsdata %>% 
+  mutate(bloodfilename = map_chr(filedata, ~.x %>% 
+                                  filter(measurement == "blood") %>% 
+                                  filter(str_detect(path, "manual_blood.json")) %>% 
+                                  slice(1) %>% 
+                                  pull(path) )) %>%
+  # Blood tsv file
+  mutate(output_basename = basename(bloodfilename),
+         output_basename = str_replace(output_basename,
+                                       "_recording-manual_blood.json",
+                                       "_inputfunction.tsv"),
+         output_folder = dirname(bloodfilename),
+         output_filename = paste0(params$studypath, "/derivatives/bloodstream", 
+                                  config_suffix, "/",
+                                  output_folder, "/", output_basename)) %>% 
+  # Blood json file
+  mutate(output_json_filename = str_replace(output_filename, "_inputfunction.tsv",
+                                           "_inputfunction.json")) %>% 
+  # Blood config file
+  mutate(output_cfg_filename = str_replace(output_filename, "_inputfunction.tsv",
+                                           "_config.json"))
+
+file.remove(bidsdata$output_filename)
+file.remove(bidsdata$output_json_filename)
+file.remove(bidsdata$output_cfg_filename)
+```
+
+
+Now the final curves need to be interpolated...
+
+```{r interpolating}
+bidsdata <- bidsdata %>% 
+  mutate(input = map(blooddata, bd_create_input)) %>% 
+  mutate(input = map(input, ~rename(.x,
+                          "time" = Time,
+                          "whole_blood_radioactivity" = Blood,
+                          "plasma_radioactivity" = Plasma,
+                          "metabolite_parent_fraction" = ParentFraction,
+                          AIF = AIF))) %>% 
+  #unit_conversion
+  mutate(input = map(input, ~mutate(.x,
+         # min to sec                            
+         time = time * 60,
+         # kBq to Bq
+         whole_blood_radioactivity = unit_convert(whole_blood_radioactivity, 
+                                                  from_units = "kBq", 
+                                                  to_units = "Bq"),
+         plasma_radioactivity = unit_convert(plasma_radioactivity, "kBq", "Bq"),
+         AIF = unit_convert(AIF, "kBq", "Bq"))))
+```
+
+... and save the tabular tsv files to the derivatives folder.
+
+```{r save-tsvs}
+walk( dirname(bidsdata$output_filename), 
+      dir.create, recursive=T)
+
+# Save interpolated tsv files
+walk2(bidsdata$input,
+     bidsdata$output_filename, ~write_delim(.x, file=.y, 
+                                            delim = "\t"))
+```
+
+
+We also save json sidecars to accompany all the tabular data.
+
+```{r save-json-sidecars}
+output_description <- list(
+  time = list(
+      Description = "Interpolated time in relation to time zero defined in _pet.json",
+      Units = "s"
+    ),
+    whole_blood_radioactivity = list(
+      Description = "Estimated interpolated radioactivity in whole blood samples",
+      Units = "Bq"
+    ),
+    plasma_radioactivity = list(
+      Description = "Estimated interpolated radioactivity in whole plasma samples",
+      Units = "Bq"
+    ),
+    AIF = list(
+      Description = "Estimated interpolated radioactivity in metabolite-corrected arterial plasma samples",
+      Units = "Bq"
+    )
+)
+
+# Save interpolated json sidecars
+walk(bidsdata$output_json_filename, ~write_json(output_description, path = .x,
+                                                pretty=TRUE))
+```
+
+
+
+And finally, we include config files describing the models used for each step.
+
+```{r, eval=parametric_aif, echo=parametric_aif}
+#| results: asis
+#| echo: false
+
+str_glue("Because we used a parametric model for the AIF, we will first add the AIF parameters to the output. These parameters are refer to Bq/mL and seconds.")
+```
+
+```{r save_config_parametricaif, eval=parametric_aif, echo=parametric_aif}
+aif_pars <- aif_data %>%
+  select(pet, aif_parameters = aif_pars)
+
+output_config <- config$Model
+
+
+add_aifpars_to_config <- function(output_config, aif_parameters) {
+  output_config$AIF$Fit$Parameters = aif_parameters
+  output_config$AIF$Fit$Units$time = "s"
+  output_config$AIF$Fit$Units$AIF = "Bq"
+  output_config
+}
+
+
+bidsdata <- bidsdata %>%
+  inner_join(aif_pars, by="pet") %>%
+  mutate(output_configdata = map(aif_parameters,
+                                 ~add_aifpars_to_config(output_config, .x)))
+
+
+walk2(bidsdata$output_configdata, bidsdata$output_cfg_filename, 
+     ~jsonlite::write_json(.x, path = .y, 
+                           pretty=T))
+```
+
+
+```{r save_config_nonparametric, eval=nonparam_aif, echo=nonparam_aif}
+output_config <- config$Model
+
+walk(bidsdata$output_cfg_filename, 
+     ~jsonlite::write_json(output_config, path = .x, pretty=T))
+```
+
+
+And finally, we save a dataset description file
+
+```{r}
+dataset_description <- list(
+  Name = "bloodstream Outputs",
+  BIDSVersion = "1.7.0",
+  DatasetType = "derivative",
+  GeneratedBy = list(
+    Name = "bloodstream",
+    Version = as.character(packageVersion("bloodstream")),
+    Container = NULL
+  )
+)
+
+jsonlite::write_json(dataset_description, 
+                     path = paste0(params$studypath, 
+                                   "/derivatives/bloodstream", config_suffix, 
+                                   "/dataset_description.json"),
+                     pretty = T)
+```
+
+
+# Session Info
+
+```{r sessioninfo}
+sessionInfo()
+```
+
